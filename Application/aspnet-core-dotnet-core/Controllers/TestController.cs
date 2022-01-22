@@ -4,41 +4,47 @@
 using aspnet_core_dotnet_core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace aspnet_core_dotnet_core.Controllers
 {
     [ApiController]
-    [Route("api/tn")]
-    public class TestController : ControllerBase
+    [Route("api/test")]
+    public class TestController : Controller
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
+        private readonly IConfiguration _configuration;
 
-        private readonly ILogger<TestController> _logger;
-
-        public TestController(ILogger<TestController> logger)
+        public TestController(IConfiguration configuration)
         {
-            _logger = logger;
+            _configuration = configuration;
         }
 
         [HttpGet]
-        public IEnumerable<Test> Get()
+        public JsonResult Get()
         {
-            var rng = new Random();
-            return Enumerable.Range(1, 5).Select(index => new Test
+            string q = "select id, name from dbo.Test";
+            DataTable table = new DataTable();
+            string sqlDataSource = _configuration.GetConnectionString("database");
+            SqlDataReader reader;
+            using(SqlConnection myCon = new SqlConnection(sqlDataSource))
             {
-                Date = DateTime.Now.AddDays(index),
-                TemperatureC = rng.Next(-20, 55),
-                Summary = Summaries[rng.Next(Summaries.Length)]
-            })
-            .ToArray();
+                myCon.Open();
+                using(SqlCommand command = new SqlCommand(q, myCon))
+                {
+                    reader = command.ExecuteReader();
+                    table.Load(reader);
+                    reader.Close();
+                    myCon.Close();
+                }
+            }
+            return new JsonResult(table);
         }
     }
 }
